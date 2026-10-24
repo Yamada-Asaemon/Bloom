@@ -76,6 +76,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale as drawScale
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.input.pointer.pointerInput
@@ -500,7 +501,7 @@ private fun TrashIcon(modifier: Modifier) {
     val paths = remember { trashPaths.map { PathParser().parsePathString(it).toPath() } }
     Canvas(modifier) {
         val k = size.width / 24f
-        androidx.compose.ui.graphics.drawscope.scale(k, pivot = Offset.Zero) {
+        drawScale(k, pivot = Offset.Zero) {
             paths.forEach {
                 drawPath(it, Color.White, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
             }
