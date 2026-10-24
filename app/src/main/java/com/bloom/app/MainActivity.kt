@@ -7,7 +7,6 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -16,17 +15,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -47,6 +42,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -77,21 +74,25 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale as drawScale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.PathParser
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -114,6 +115,48 @@ private val HabitGreen = Color(0xFF008000)
 
 private const val MAX_LEN = 25
 private val milestones = listOf(1, 7, 14, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 365)
+
+// ───────────── Small Caps (ручная имитация, работает для любого шрифта) ─────────────
+private const val SC_SCALE = 0.8f
+
+private fun smallCaps(text: String, size: TextUnit, base: SpanStyle = SpanStyle()): AnnotatedString =
+    buildAnnotatedString {
+        for (ch in text) {
+            if (ch.isLetter()) {
+                withStyle(base.copy(fontSize = size * SC_SCALE)) { append(ch.uppercaseChar()) }
+            } else {
+                withStyle(base) { append(ch) }
+            }
+        }
+    }
+
+@Composable
+private fun SCText(
+    text: String,
+    fontSize: TextUnit,
+    modifier: Modifier = Modifier,
+    color: Color = Color.White,
+    fontWeight: FontWeight? = null,
+    letterSpacing: TextUnit = TextUnit.Unspecified,
+    lineHeight: TextUnit = TextUnit.Unspecified,
+    textAlign: TextAlign? = null
+) {
+    val styled = remember(text, fontSize) { smallCaps(text, fontSize) }
+    Text(
+        text = styled,
+        modifier = modifier,
+        color = color,
+        fontSize = fontSize,
+        fontWeight = fontWeight,
+        letterSpacing = letterSpacing,
+        lineHeight = lineHeight,
+        textAlign = textAlign
+    )
+}
+
+private val SmallCapsTransformation = VisualTransformation { text ->
+    TransformedText(smallCaps(text.text, 13.sp), OffsetMapping.Identity)
+}
 
 // ───────────── Модель и хранение (вместо localStorage) ─────────────
 data class Habit(val name: String, val color: Int, val startTime: Long)
@@ -176,10 +219,10 @@ class MainActivity : ComponentActivity() {
 fun BloomApp() {
     val ctx = LocalContext.current
     val focusManager = LocalFocusManager.current
-    val density = LocalDensity.current
 
     val habits = remember { mutableStateListOf<Habit>().also { it.addAll(loadHabits(ctx)) } }
-    var index by remember { mutableIntStateOf(0) }
+    val pagerState = rememberPagerState(pageCount = { habits.size })
+    var pendingPage by remember { mutableIntStateOf(-1) }
     var showAdd by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
@@ -194,6 +237,21 @@ fun BloomApp() {
         }
     }
 
+    // плавный переход к только что добавленной привычке
+    LaunchedEffect(pendingPage) {
+        if (pendingPage >= 0) {
+            pagerState.animateScrollToPage(pendingPage)
+            pendingPage = -1
+        }
+    }
+
+    // после удаления не выходим за границы
+    LaunchedEffect(habits.size) {
+        if (habits.isNotEmpty() && pagerState.currentPage > habits.size - 1) {
+            pagerState.scrollToPage(habits.size - 1)
+        }
+    }
+
     fun closeAdd() {
         focusManager.clearFocus()
         showAdd = false
@@ -205,48 +263,35 @@ fun BloomApp() {
         if (showDelete) showDelete = false else closeAdd()
     }
 
-    val swipePx = with(density) { 50.dp.toPx() }
-
     Box(Modifier.fillMaxSize().background(Bg)) {
 
         // ── основной слой ──
         Box(Modifier.fillMaxSize().systemBarsPadding()) {
             if (habits.isNotEmpty()) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .pointerInput(index, habits.size) {
-                            var total = 0f
-                            detectHorizontalDragGestures(
-                                onDragStart = { total = 0f },
-                                onDragCancel = { total = 0f },
-                                onDragEnd = {
-                                    if (abs(total) >= swipePx) {
-                                        if (total < 0 && index < habits.size - 1) index++
-                                        else if (total > 0 && index > 0) index--
-                                    }
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    val habit = habits.getOrNull(page)
+                    if (habit != null) {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    val offset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+                                    val d = abs(offset).coerceIn(0f, 1f)
+                                    alpha = 1f - 0.7f * d
+                                    val s = 1f - 0.06f * d
+                                    scaleX = s
+                                    scaleY = s
                                 }
-                            ) { _, dx -> total += dx }
-                        }
-                ) {
-                    AnimatedContent(
-                        targetState = index,
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.TopCenter,
-                        transitionSpec = {
-                            val dir = if (targetState > initialState) 1 else -1
-                            (slideInHorizontally(tween(250)) { 30 * dir } + fadeIn(tween(250))) togetherWith
-                                (slideOutHorizontally(tween(250)) { -30 * dir } + fadeOut(tween(250)))
-                        },
-                        label = "habit"
-                    ) { i ->
-                        val habit = habits.getOrNull(i)
-                        if (habit != null) {
+                        ) {
                             HabitContent(
                                 habit = habit,
                                 now = now,
                                 count = habits.size,
-                                position = i,
+                                activePage = pagerState.currentPage,
+                                position = page,
                                 onDelete = { showDelete = true }
                             )
                         }
@@ -266,7 +311,7 @@ fun BloomApp() {
                     .padding(horizontal = 24.dp, vertical = 16.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text("добавить привычку", color = Color.White, fontSize = 13.sp, letterSpacing = 1.5.sp)
+                SCText("добавить привычку", fontSize = 13.sp, letterSpacing = 1.5.sp)
             }
         }
 
@@ -281,7 +326,7 @@ fun BloomApp() {
         ) {
             AddPanel(
                 name = name,
-                onNameChange = { if (it.length <= MAX_LEN) name = it.lowercase() },
+                onNameChange = { if (it.length <= MAX_LEN) name = it },
                 picked = picked,
                 onPick = { picked = it },
                 focusRequester = inputFocus,
@@ -293,7 +338,7 @@ fun BloomApp() {
                         habits.add(
                             Habit(trimmed, (picked ?: Color.White).toArgb(), System.currentTimeMillis())
                         )
-                        index = habits.size - 1
+                        pendingPage = habits.size - 1
                         saveHabits(ctx, habits.toList())
                         closeAdd()
                     }
@@ -313,8 +358,7 @@ fun BloomApp() {
             DeletePanel(
                 onYes = {
                     if (habits.isNotEmpty()) {
-                        habits.removeAt(index.coerceIn(0, habits.size - 1))
-                        index = if (habits.isEmpty()) 0 else index.coerceIn(0, habits.size - 1)
+                        habits.removeAt(pagerState.currentPage.coerceIn(0, habits.size - 1))
                         saveHabits(ctx, habits.toList())
                     }
                     showDelete = false
@@ -327,7 +371,14 @@ fun BloomApp() {
 
 // ───────────── Экран одной привычки ─────────────
 @Composable
-private fun HabitContent(habit: Habit, now: Long, count: Int, position: Int, onDelete: () -> Unit) {
+private fun HabitContent(
+    habit: Habit,
+    now: Long,
+    count: Int,
+    activePage: Int,
+    position: Int,
+    onDelete: () -> Unit
+) {
     val habitColor = Color(habit.color)
     val elapsedMs = (now - habit.startTime).coerceAtLeast(0)
     val totalSec = elapsedMs / 1000
@@ -344,8 +395,8 @@ private fun HabitContent(habit: Habit, now: Long, count: Int, position: Int, onD
 
         // заголовок + корзина
         Box(Modifier.fillMaxWidth().padding(horizontal = 30.dp).heightIn(min = 32.dp)) {
-            Text(
-                text = habit.name.lowercase(),
+            SCText(
+                text = habit.name,
                 color = habitColor,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
@@ -412,7 +463,7 @@ private fun HabitContent(habit: Habit, now: Long, count: Int, position: Int, onD
             Spacer(Modifier.height(15.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 repeat(count) { i ->
-                    val active = i == position
+                    val active = i == activePage
                     val s by animateFloatAsState(if (active) 1.3f else 1f, tween(300), label = "dot")
                     Box(
                         Modifier
@@ -440,7 +491,7 @@ private fun HabitContent(habit: Habit, now: Long, count: Int, position: Int, onD
         ) {
             Text(
                 text = buildAnnotatedString {
-                    withStyle(SpanStyle(color = Muted.copy(alpha = 0.51f))) { append("привычка создана: ") }
+                    append(smallCaps("привычка создана: ", 12.sp, SpanStyle(color = Muted.copy(alpha = 0.51f))))
                     withStyle(SpanStyle(color = Color.White, fontWeight = FontWeight.SemiBold, letterSpacing = 1.4.sp)) {
                         append(formatDateTime(habit.startTime))
                     }
@@ -463,7 +514,7 @@ private fun TimerUnit(label: String, value: String) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Text(label, color = Muted, fontSize = 10.sp, letterSpacing = 1.5.sp)
+        SCText(label, color = Muted, fontSize = 10.sp, letterSpacing = 1.5.sp)
         Text(
             value,
             color = Color.White,
@@ -545,7 +596,7 @@ private fun AddPanel(
             .imePadding()
             .padding(30.dp)
     ) {
-        Text("название привычки", color = Color.White, fontSize = 13.sp, letterSpacing = 1.5.sp)
+        SCText("название привычки", fontSize = 13.sp, letterSpacing = 1.5.sp)
         Spacer(Modifier.height(12.dp))
 
         BasicTextField(
@@ -553,6 +604,7 @@ private fun AddPanel(
             onValueChange = onNameChange,
             singleLine = true,
             interactionSource = interaction,
+            visualTransformation = SmallCapsTransformation,
             textStyle = TextStyle(color = Color.White, fontSize = 13.sp, letterSpacing = 1.5.sp),
             cursorBrush = SolidColor(Color.White),
             modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
@@ -567,7 +619,12 @@ private fun AddPanel(
                             .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 56.dp)
                     ) {
                         if (name.isEmpty()) {
-                            Text("введите название", color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp, letterSpacing = 1.5.sp)
+                            SCText(
+                                "введите название",
+                                color = Color.White.copy(alpha = 0.6f),
+                                fontSize = 13.sp,
+                                letterSpacing = 1.5.sp
+                            )
                         }
                         inner()
                     }
@@ -583,7 +640,7 @@ private fun AddPanel(
         )
 
         Spacer(Modifier.height(25.dp))
-        Text("цвет", color = Color.White, fontSize = 13.sp, letterSpacing = 1.5.sp)
+        SCText("цвет", fontSize = 13.sp, letterSpacing = 1.5.sp)
         Spacer(Modifier.height(12.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(15.dp)) {
@@ -610,7 +667,7 @@ private fun AddPanel(
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text("добавить", color = Color.White, fontSize = 13.sp, letterSpacing = 1.5.sp)
+            SCText("добавить", fontSize = 13.sp, letterSpacing = 1.5.sp)
         }
     }
 }
@@ -627,9 +684,8 @@ private fun DeletePanel(onYes: () -> Unit, onNo: () -> Unit) {
             .padding(start = 26.dp, top = 24.dp, end = 26.dp, bottom = 22.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
+        SCText(
             "вы действительно хотите удалить привычку?",
-            color = Color.White,
             fontSize = 14.sp,
             letterSpacing = 1.2.sp,
             lineHeight = 21.sp,
@@ -653,7 +709,7 @@ private fun DeleteButton(label: String, onClick: () -> Unit, modifier: Modifier)
             .padding(horizontal = 18.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(label, color = Color.White, fontSize = 13.sp, letterSpacing = 1.5.sp)
+        SCText(label, fontSize = 13.sp, letterSpacing = 1.5.sp)
     }
 }
 
