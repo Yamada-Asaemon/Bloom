@@ -154,8 +154,12 @@ private fun SCText(
     )
 }
 
+// Для поля ввода: весь текст одного размера (без разных спанов), чтобы строка не прыгала
 private val SmallCapsTransformation = VisualTransformation { text ->
-    TransformedText(smallCaps(text.text, 13.sp), OffsetMapping.Identity)
+    val upper = buildString {
+        for (ch in text.text) append(if (ch.isLetter()) ch.uppercaseChar() else ch)
+    }
+    TransformedText(AnnotatedString(upper), OffsetMapping.Identity)
 }
 
 // ───────────── Модель и хранение (вместо localStorage) ─────────────
@@ -291,7 +295,6 @@ fun BloomApp() {
                                 now = now,
                                 count = habits.size,
                                 activePage = pagerState.currentPage,
-                                position = page,
                                 onDelete = { showDelete = true }
                             )
                         }
@@ -376,7 +379,6 @@ private fun HabitContent(
     now: Long,
     count: Int,
     activePage: Int,
-    position: Int,
     onDelete: () -> Unit
 ) {
     val habitColor = Color(habit.color)
@@ -605,7 +607,7 @@ private fun AddPanel(
             singleLine = true,
             interactionSource = interaction,
             visualTransformation = SmallCapsTransformation,
-            textStyle = TextStyle(color = Color.White, fontSize = 13.sp, letterSpacing = 1.5.sp),
+            textStyle = TextStyle(color = Color.White, fontSize = (13 * SC_SCALE).sp, letterSpacing = 1.5.sp),
             cursorBrush = SolidColor(Color.White),
             modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
             decorationBox = { inner ->
@@ -619,10 +621,10 @@ private fun AddPanel(
                             .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 56.dp)
                     ) {
                         if (name.isEmpty()) {
-                            SCText(
-                                "введите название",
+                            Text(
+                                "введите название".uppercase(),
                                 color = Color.White.copy(alpha = 0.6f),
-                                fontSize = 13.sp,
+                                fontSize = (13 * SC_SCALE).sp,
                                 letterSpacing = 1.5.sp
                             )
                         }
