@@ -20,6 +20,12 @@ jobs:
         with:
           gradle-version: 8.9
 
+      # Постоянный ключ подписи: чтобы новые версии ставились поверх старых без потери данных
+      - name: Restore debug keystore
+        run: |
+          mkdir -p ~/.android
+          if [ -f debug.keystore.b64 ]; then base64 -d debug.keystore.b64 > ~/.android/debug.keystore; fi
+
       - name: Prepare icon
         run: |
           mkdir -p app/src/main/res/drawable-nodpi
