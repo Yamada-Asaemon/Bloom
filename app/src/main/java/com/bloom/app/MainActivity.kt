@@ -186,7 +186,13 @@ fun MainScreen() {
         AlertDialog(
             onDismissRequest = { deleteId = null },
             containerColor = CardBg,
-            title = { Text("Удалить привычку?", color = Color.White, fontSize = 18.sp) },
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text(
+                    "УДАЛИТЬ ПРИВЫЧКУ?", color = Color.White,
+                    fontSize = 14.sp, letterSpacing = 2.sp
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     habits.firstOrNull { it.id == id }?.let {
@@ -196,10 +202,14 @@ fun MainScreen() {
                     habits = habits.filter { it.id != id }
                     Store.save(ctx, habits)
                     deleteId = null
-                }) { Text("УДАЛИТЬ", color = HabitRed) }
+                }) {
+                    Text("УДАЛИТЬ", color = HabitRed, fontSize = 12.sp, letterSpacing = 2.sp)
+                }
             },
             dismissButton = {
-                TextButton(onClick = { deleteId = null }) { Text("ОТМЕНА", color = Gray) }
+                TextButton(onClick = { deleteId = null }) {
+                    Text("ОТМЕНА", color = Gray, fontSize = 12.sp, letterSpacing = 2.sp)
+                }
             }
         )
     }
