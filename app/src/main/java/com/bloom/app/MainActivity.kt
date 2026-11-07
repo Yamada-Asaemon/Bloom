@@ -39,8 +39,12 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -333,21 +337,18 @@ fun TimerRow(elapsed: Long) {
 
 @Composable
 fun DateCard(ts: Long) {
-    val date = remember(ts) {
-        SimpleDateFormat("d MMMM yyyy", Locale.forLanguageTag("ru")).format(Date(ts)).uppercase()
-    }
+    val date = remember(ts) { SimpleDateFormat("dd.MM.yyyy", Locale.US).format(Date(ts)) }
     val time = remember(ts) { SimpleDateFormat("HH:mm", Locale.US).format(Date(ts)) }
     val shape = RoundedCornerShape(20.dp)
 
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 28.dp)
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp)
             .clip(shape)
             .background(Brush.horizontalGradient(listOf(Color(0xFF26203A), Color(0xFF1A1A22))))
             .border(1.dp, Violet.copy(alpha = 0.45f), shape)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // тональный круг с иконкой календаря
         Box(
             Modifier.size(42.dp).clip(CircleShape).background(Violet.copy(alpha = 0.28f)),
             contentAlignment = Alignment.Center
@@ -370,12 +371,11 @@ fun DateCard(ts: Long) {
             Text("СОЗДАНА", color = Gray, fontSize = 9.sp, letterSpacing = 2.sp)
             Spacer(Modifier.height(2.dp))
             Text(
-                date, color = Color.White, fontSize = 14.sp,
+                date, color = Color.White, fontSize = 15.sp,
                 fontWeight = FontWeight.Bold, letterSpacing = 1.sp, maxLines = 1
             )
         }
         Spacer(Modifier.width(8.dp))
-        // плашка со временем
         Box(
             Modifier.clip(RoundedCornerShape(10.dp))
                 .background(Violet.copy(alpha = 0.28f))
@@ -386,12 +386,16 @@ fun DateCard(ts: Long) {
     }
 }
 
+private val UpperCase = VisualTransformation {
+    TransformedText(AnnotatedString(it.text.uppercase()), OffsetMapping.Identity)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddSheet(onDismiss: () -> Unit, onAdd: (String, Color) -> Unit) {
     var name by remember { mutableStateOf("") }
     var color by remember { mutableStateOf<Color?>(null) }
-    val ready = name.isNotBlank() && color != null
+    val ready = name.isNotBlank()
     val fieldShape = RoundedCornerShape(14.dp)
 
     ModalBottomSheet(
@@ -410,7 +414,8 @@ fun AddSheet(onDismiss: () -> Unit, onAdd: (String, Color) -> Unit) {
                 value = name,
                 onValueChange = { if (it.length <= 25) name = it },
                 singleLine = true,
-                textStyle = TextStyle(color = Color.White, fontSize = 14.sp, letterSpacing = 1.sp),
+                visualTransformation = UpperCase,
+                textStyle = TextStyle(color = Color.White, fontSize = 12.sp, letterSpacing = 2.sp),
                 cursorBrush = SolidColor(VioletLight),
                 modifier = Modifier.fillMaxWidth(),
                 decorationBox = { inner ->
@@ -448,7 +453,7 @@ fun AddSheet(onDismiss: () -> Unit, onAdd: (String, Color) -> Unit) {
                 text = "ДОБАВИТЬ",
                 modifier = Modifier.align(Alignment.CenterHorizontally),
                 enabled = ready,
-                onClick = { color?.let { onAdd(name.trim(), it) } }
+                onClick = { onAdd(name.trim(), color ?: Color.White) }
             )
         }
     }
