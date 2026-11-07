@@ -19,6 +19,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -30,6 +31,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -37,6 +39,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -58,37 +61,30 @@ private val HabitRed = Color(0xFFFF5C5C)
 private val HabitYellow = Color(0xFFFFD600)
 private val HabitGreen = Color(0xFF008000)
 
+private val ButtonShape = RoundedCornerShape(14.dp)
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Notifier.ensureChannel(this)
-        setContent { BloomApp() }
+        setContent { MainScreen() }
     }
 }
 
 @Composable
-fun BloomApp() {
-    var splash by rememberSaveable { mutableStateOf(true) }
-    LaunchedEffect(Unit) {
-        delay(2000)
-        splash = false
-    }
-    if (splash) SplashScreen() else MainScreen()
-}
-
-@Composable
-fun SplashScreen() {
-    Column(
-        Modifier.fillMaxSize().background(Bg),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Image(painterResource(R.drawable.ic_lotus), null, Modifier.size(110.dp))
-        Spacer(Modifier.height(20.dp))
-        Text(
-            "BLOOM", color = Color.White, fontSize = 28.sp,
-            fontWeight = FontWeight.Bold, letterSpacing = 6.sp
+fun PrimaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.fillMaxWidth(0.55f).height(46.dp),
+        shape = ButtonShape,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Violet, contentColor = Color.White,
+            disabledContainerColor = Violet.copy(alpha = 0.4f),
+            disabledContentColor = Color.White.copy(alpha = 0.6f)
         )
+    ) {
+        Text(text, fontSize = 12.sp, letterSpacing = 2.sp)
     }
 }
 
@@ -103,7 +99,6 @@ fun MainScreen() {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val pagerState = rememberPagerState { habits.size }
 
-    // тикающие секунды
     LaunchedEffect(Unit) {
         while (true) {
             now = System.currentTimeMillis()
@@ -111,7 +106,6 @@ fun MainScreen() {
         }
     }
 
-    // разрешение на уведомления + перепланирование
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -121,14 +115,12 @@ fun MainScreen() {
         Store.load(ctx).forEach { Notifier.schedule(ctx, it) }
     }
 
-    // переход на новую привычку после добавления
     var lastCount by remember { mutableIntStateOf(habits.size) }
     LaunchedEffect(habits.size) {
         if (habits.size > lastCount) pagerState.animateScrollToPage(habits.size - 1)
         lastCount = habits.size
     }
 
-    // галерея
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         val id = pickFor
         if (uri != null && id != null) {
@@ -153,12 +145,12 @@ fun MainScreen() {
             }
             if (habits.size > 1) {
                 Row(
-                    Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
                     habits.indices.forEach { i ->
                         Box(
-                            Modifier.size(8.dp).clip(CircleShape)
+                            Modifier.size(7.dp).clip(CircleShape)
                                 .background(if (i == pagerState.currentPage) VioletLight else Track)
                         )
                     }
@@ -166,15 +158,11 @@ fun MainScreen() {
             }
         }
 
-        Button(
-            onClick = { showAdd = true },
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp)
-                .fillMaxWidth(0.6f).height(52.dp),
-            shape = RoundedCornerShape(26.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Violet, contentColor = Color.White)
-        ) {
-            Text("ДОБАВИТЬ ПРИВЫЧКУ", fontSize = 13.sp, letterSpacing = 2.sp)
-        }
+        PrimaryButton(
+            text = "ДОБАВИТЬ ПРИВЫЧКУ",
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp),
+            onClick = { showAdd = true }
+        )
     }
 
     if (showAdd) {
@@ -194,7 +182,7 @@ fun MainScreen() {
         AlertDialog(
             onDismissRequest = { deleteId = null },
             containerColor = CardBg,
-            title = { Text("Удалить привычку?", color = Color.White) },
+            title = { Text("Удалить привычку?", color = Color.White, fontSize = 18.sp) },
             confirmButton = {
                 TextButton(onClick = {
                     habits.firstOrNull { it.id == id }?.let {
@@ -220,33 +208,33 @@ fun HabitPage(h: Habit, now: Long, onDelete: () -> Unit, onPhoto: () -> Unit) {
 
     Box(Modifier.fillMaxSize()) {
         Column(
-            Modifier.fillMaxSize().padding(bottom = 110.dp),
+            Modifier.fillMaxSize().padding(bottom = 96.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.height(40.dp))
-            Text(
-                h.name.uppercase(), color = color, fontSize = 24.sp,
-                fontWeight = FontWeight.Bold, letterSpacing = 4.sp,
-                textAlign = TextAlign.Center, maxLines = 2,
-                modifier = Modifier.padding(horizontal = 72.dp)
-            )
             Spacer(Modifier.height(32.dp))
-            Ring(h, color, elapsed)
-            Spacer(Modifier.height(44.dp))
-            TimerRow(elapsed)
+            Text(
+                h.name.uppercase(), color = color, fontSize = 20.sp,
+                fontWeight = FontWeight.Bold, letterSpacing = 3.sp,
+                textAlign = TextAlign.Center, maxLines = 2,
+                modifier = Modifier.padding(horizontal = 68.dp)
+            )
             Spacer(Modifier.height(28.dp))
-            DateChip(h.createdAt)
+            Ring(h, color, elapsed)
+            Spacer(Modifier.height(36.dp))
+            TimerRow(elapsed)
+            Spacer(Modifier.height(24.dp))
+            DateCard(h.createdAt)
         }
 
         Column(
-            Modifier.align(Alignment.TopEnd).padding(top = 28.dp, end = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            Modifier.align(Alignment.TopEnd).padding(top = 22.dp, end = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             IconButton(onClick = onDelete) {
-                Icon(painterResource(R.drawable.ic_trash), null, Modifier.size(32.dp), tint = Color.White)
+                Icon(painterResource(R.drawable.ic_trash), null, Modifier.size(26.dp), tint = Color.White)
             }
             IconButton(onClick = onPhoto) {
-                Icon(painterResource(R.drawable.ic_camera), null, Modifier.size(32.dp), tint = Color.White)
+                Icon(painterResource(R.drawable.ic_camera), null, Modifier.size(26.dp), tint = Color.White)
             }
         }
     }
@@ -260,8 +248,8 @@ fun Ring(h: Habit, color: Color, elapsed: Long) {
     val progress = ((elapsed - prev * Milestones.DAY).toFloat() /
             ((next - prev) * Milestones.DAY).toFloat()).coerceIn(0f, 1f)
 
-    val total = 270.dp
-    val stroke = 14.dp
+    val total = 236.dp
+    val stroke = 12.dp
 
     Box(Modifier.size(total), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
@@ -313,28 +301,28 @@ fun TimerRow(elapsed: Long) {
         "СЕКУНДЫ" to s % 60
     )
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp),
         verticalAlignment = Alignment.Bottom
     ) {
         parts.forEachIndexed { i, (label, v) ->
             if (i > 0) {
                 Text(
-                    ":", color = Violet, fontSize = 26.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 3.dp).padding(bottom = 14.dp)
+                    ":", color = Violet, fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 3.dp).padding(bottom = 10.dp)
                 )
             }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(label, color = Gray, fontSize = 9.sp, letterSpacing = 1.sp, maxLines = 1)
-                Spacer(Modifier.height(8.dp))
+                Text(label, color = Gray, fontSize = 8.sp, letterSpacing = 1.sp, maxLines = 1)
+                Spacer(Modifier.height(6.dp))
                 Box(
-                    Modifier.fillMaxWidth().height(64.dp)
-                        .clip(RoundedCornerShape(16.dp)).background(CardBg)
-                        .border(1.5.dp, Violet, RoundedCornerShape(16.dp)),
+                    Modifier.fillMaxWidth().height(52.dp)
+                        .clip(RoundedCornerShape(14.dp)).background(CardBg)
+                        .border(1.5.dp, Violet, RoundedCornerShape(14.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         v.toString().padStart(2, '0'), color = VioletLight,
-                        fontSize = 32.sp, fontWeight = FontWeight.Bold,
+                        fontSize = 26.sp, fontWeight = FontWeight.Bold,
                         maxLines = 1, softWrap = false
                     )
                 }
@@ -344,36 +332,56 @@ fun TimerRow(elapsed: Long) {
 }
 
 @Composable
-fun DateChip(ts: Long) {
-    val date = remember(ts) { SimpleDateFormat("dd.MM.yyyy", Locale.US).format(Date(ts)) }
+fun DateCard(ts: Long) {
+    val date = remember(ts) {
+        SimpleDateFormat("d MMMM yyyy", Locale.forLanguageTag("ru")).format(Date(ts)).uppercase()
+    }
     val time = remember(ts) { SimpleDateFormat("HH:mm", Locale.US).format(Date(ts)) }
     val shape = RoundedCornerShape(20.dp)
+
     Row(
-        Modifier.clip(shape).background(CardBg).border(1.dp, Color(0xFF2E2E3A), shape)
-            .padding(horizontal = 22.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 28.dp)
+            .clip(shape)
+            .background(Brush.horizontalGradient(listOf(Color(0xFF26203A), Color(0xFF1A1A22))))
+            .border(1.dp, Violet.copy(alpha = 0.45f), shape)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Canvas(Modifier.size(26.dp)) {
-            val sw = 2.dp.toPx()
-            val c = VioletLight
-            drawRoundRect(
-                c, topLeft = Offset(sw, size.height * 0.18f),
-                size = Size(size.width - 2 * sw, size.height * 0.74f),
-                cornerRadius = CornerRadius(5.dp.toPx()), style = Stroke(sw)
-            )
-            drawLine(c, Offset(sw, size.height * 0.42f), Offset(size.width - sw, size.height * 0.42f), sw)
-            drawLine(c, Offset(size.width * 0.3f, sw / 2), Offset(size.width * 0.3f, size.height * 0.3f), sw, StrokeCap.Round)
-            drawLine(c, Offset(size.width * 0.7f, sw / 2), Offset(size.width * 0.7f, size.height * 0.3f), sw, StrokeCap.Round)
-        }
-        Spacer(Modifier.width(14.dp))
-        Column {
-            Text("СОЗДАНА", color = Gray, fontSize = 10.sp, letterSpacing = 2.sp)
-            Spacer(Modifier.height(2.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(date, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                Text("  •  ", color = Violet, fontSize = 16.sp)
-                Text(time, color = VioletLight, fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        // тональный круг с иконкой календаря
+        Box(
+            Modifier.size(42.dp).clip(CircleShape).background(Violet.copy(alpha = 0.28f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(Modifier.size(20.dp)) {
+                val sw = 1.8.dp.toPx()
+                val c = VioletLight
+                drawRoundRect(
+                    c, topLeft = Offset(sw, size.height * 0.18f),
+                    size = Size(size.width - 2 * sw, size.height * 0.74f),
+                    cornerRadius = CornerRadius(4.dp.toPx()), style = Stroke(sw)
+                )
+                drawLine(c, Offset(sw, size.height * 0.42f), Offset(size.width - sw, size.height * 0.42f), sw)
+                drawLine(c, Offset(size.width * 0.3f, sw / 2), Offset(size.width * 0.3f, size.height * 0.3f), sw, StrokeCap.Round)
+                drawLine(c, Offset(size.width * 0.7f, sw / 2), Offset(size.width * 0.7f, size.height * 0.3f), sw, StrokeCap.Round)
             }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("СОЗДАНА", color = Gray, fontSize = 9.sp, letterSpacing = 2.sp)
+            Spacer(Modifier.height(2.dp))
+            Text(
+                date, color = Color.White, fontSize = 14.sp,
+                fontWeight = FontWeight.Bold, letterSpacing = 1.sp, maxLines = 1
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        // плашка со временем
+        Box(
+            Modifier.clip(RoundedCornerShape(10.dp))
+                .background(Violet.copy(alpha = 0.28f))
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+        ) {
+            Text(time, color = VioletLight, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         }
     }
 }
@@ -384,60 +392,64 @@ fun AddSheet(onDismiss: () -> Unit, onAdd: (String, Color) -> Unit) {
     var name by remember { mutableStateOf("") }
     var color by remember { mutableStateOf<Color?>(null) }
     val ready = name.isNotBlank() && color != null
+    val fieldShape = RoundedCornerShape(14.dp)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = CardBg,
-        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         dragHandle = null
     ) {
         Column(
             Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
-                .padding(horizontal = 32.dp, vertical = 32.dp)
+                .padding(horizontal = 24.dp, vertical = 24.dp)
         ) {
-            Text("НАЗВАНИЕ ПРИВЫЧКИ", color = Color.White, fontSize = 14.sp, letterSpacing = 3.sp)
-            Spacer(Modifier.height(18.dp))
-            OutlinedTextField(
+            Text("НАЗВАНИЕ ПРИВЫЧКИ", color = Color.White, fontSize = 12.sp, letterSpacing = 2.sp)
+            Spacer(Modifier.height(14.dp))
+            BasicTextField(
                 value = name,
                 onValueChange = { if (it.length <= 25) name = it },
-                modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                shape = RoundedCornerShape(28.dp),
-                placeholder = { Text("ВВЕДИТЕ НАЗВАНИЕ", color = Gray, fontSize = 14.sp, letterSpacing = 2.sp) },
-                trailingIcon = { Text("${name.length}/25", color = Gray, modifier = Modifier.padding(end = 12.dp)) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Track, unfocusedContainerColor = Track,
-                    focusedBorderColor = VioletLight, unfocusedBorderColor = Color(0xFF6B6B75),
-                    focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-                    cursorColor = VioletLight
-                )
+                textStyle = TextStyle(color = Color.White, fontSize = 14.sp, letterSpacing = 1.sp),
+                cursorBrush = SolidColor(VioletLight),
+                modifier = Modifier.fillMaxWidth(),
+                decorationBox = { inner ->
+                    Row(
+                        Modifier.fillMaxWidth().height(46.dp).clip(fieldShape)
+                            .background(Track)
+                            .border(1.dp, Color(0xFF6B6B75), fieldShape)
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(Modifier.weight(1f)) {
+                            if (name.isEmpty()) {
+                                Text("ВВЕДИТЕ НАЗВАНИЕ", color = Gray, fontSize = 12.sp, letterSpacing = 2.sp)
+                            }
+                            inner()
+                        }
+                        Text("${name.length}/25", color = Gray, fontSize = 12.sp)
+                    }
+                }
             )
-            Spacer(Modifier.height(28.dp))
-            Text("ЦВЕТ", color = Color.White, fontSize = 14.sp, letterSpacing = 3.sp)
-            Spacer(Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            Spacer(Modifier.height(22.dp))
+            Text("ЦВЕТ", color = Color.White, fontSize = 12.sp, letterSpacing = 2.sp)
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 listOf(HabitRed, HabitYellow, HabitGreen).forEach { c ->
                     Box(
-                        Modifier.size(36.dp).clip(CircleShape).background(c)
-                            .then(if (color == c) Modifier.border(3.dp, Color.White, CircleShape) else Modifier)
+                        Modifier.size(28.dp).clip(CircleShape).background(c)
+                            .then(if (color == c) Modifier.border(2.5.dp, Color.White, CircleShape) else Modifier)
                             .clickable { color = c }
                     )
                 }
             }
-            Spacer(Modifier.height(28.dp))
-            Button(
-                onClick = { color?.let { onAdd(name.trim(), it) } },
+            Spacer(Modifier.height(22.dp))
+            PrimaryButton(
+                text = "ДОБАВИТЬ",
+                modifier = Modifier.align(Alignment.CenterHorizontally),
                 enabled = ready,
-                modifier = Modifier.align(Alignment.CenterHorizontally).fillMaxWidth(0.6f).height(52.dp),
-                shape = RoundedCornerShape(26.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = HabitGreen, contentColor = Color.White,
-                    disabledContainerColor = HabitGreen.copy(alpha = 0.4f),
-                    disabledContentColor = Color.White.copy(alpha = 0.6f)
-                )
-            ) {
-                Text("ДОБАВИТЬ", fontSize = 14.sp, letterSpacing = 2.sp)
-            }
+                onClick = { color?.let { onAdd(name.trim(), it) } }
+            )
         }
     }
 }
