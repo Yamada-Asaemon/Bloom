@@ -40,12 +40,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -54,6 +57,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 private val Bg = Color(0xFF121212)
 private val CardBg = Color(0xFF1E1E26)
@@ -408,6 +412,24 @@ fun AddSheet(onDismiss: () -> Unit, onAdd: (String, Color) -> Unit) {
     val ready = name.isNotBlank()
     val fieldShape = RoundedCornerShape(14.dp)
 
+    // московское время, тикает каждую секунду
+    val moscowFormat = remember {
+        SimpleDateFormat("HH.mm.ss", Locale.US).apply { timeZone = TimeZone.getTimeZone("Europe/Moscow") }
+    }
+    var clock by remember { mutableStateOf(moscowFormat.format(Date())) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            val t = System.currentTimeMillis()
+            clock = moscowFormat.format(Date(t))
+            delay(1000 - t % 1000)
+        }
+    }
+    val clockText = buildAnnotatedString {
+        clock.forEach { ch ->
+            if (ch == '.') withStyle(SpanStyle(color = Violet)) { append(ch) } else append(ch)
+        }
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = CardBg,
@@ -447,17 +469,36 @@ fun AddSheet(onDismiss: () -> Unit, onAdd: (String, Color) -> Unit) {
                 }
             )
             Spacer(Modifier.height(22.dp))
-            Text("ЦВЕТ", color = Color.White, fontSize = 12.sp, letterSpacing = 2.sp)
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                listOf(HabitRed, HabitYellow, HabitGreen).forEach { c ->
-                    Box(
-                        Modifier.size(28.dp).clip(CircleShape).background(c)
-                            .then(if (color == c) Modifier.border(2.5.dp, Color.White, CircleShape) else Modifier)
-                            .clickable { color = c }
-                    )
+
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Column {
+                    Text("ЦВЕТ", color = Color.White, fontSize = 12.sp, letterSpacing = 2.sp)
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        listOf(HabitRed, HabitYellow, HabitGreen).forEach { c ->
+                            Box(
+                                Modifier.size(28.dp).clip(CircleShape).background(c)
+                                    .then(if (color == c) Modifier.border(2.5.dp, Color.White, CircleShape) else Modifier)
+                                    .clickable { color = c }
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("ВРЕМЯ", color = Color.White, fontSize = 12.sp, letterSpacing = 2.sp)
+                    Spacer(Modifier.height(12.dp))
+                    Box(Modifier.height(28.dp), contentAlignment = Alignment.CenterEnd) {
+                        Text(
+                            clockText, color = VioletLight, fontSize = 17.sp,
+                            fontWeight = FontWeight.Medium, letterSpacing = 2.sp,
+                            style = TextStyle(fontFeatureSettings = "tnum"),
+                            maxLines = 1, softWrap = false
+                        )
+                    }
                 }
             }
+
             Spacer(Modifier.height(22.dp))
             PrimaryButton(
                 text = "ДОБАВИТЬ",
