@@ -26,11 +26,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -240,8 +240,8 @@ fun HabitPage(h: Habit, now: Long, onDelete: () -> Unit, onPhoto: () -> Unit) {
             Ring(h, color, elapsed)
             Spacer(Modifier.height(36.dp))
             TimerRow(elapsed)
-            Spacer(Modifier.height(24.dp))
-            DateCard(h.createdAt)
+            Spacer(Modifier.height(20.dp))
+            DateRow(h.createdAt)
         }
 
         Column(
@@ -350,47 +350,53 @@ fun TimerRow(elapsed: Long) {
 }
 
 @Composable
-fun DateCard(ts: Long) {
+fun DateRow(ts: Long) {
     val date = remember(ts) { SimpleDateFormat("dd.MM.yyyy", Locale.US).format(Date(ts)) }
     val time = remember(ts) { SimpleDateFormat("HH:mm", Locale.US).format(Date(ts)) }
-    val shape = RoundedCornerShape(20.dp)
 
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 20.dp)
-            .height(IntrinsicSize.Min)
-            .clip(shape)
-            .background(Brush.horizontalGradient(listOf(Color(0xFF241E38), Color(0xFF1A1A22))))
-            .border(1.dp, Violet.copy(alpha = 0.45f), shape)
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Column(Modifier.weight(1.6f).padding(horizontal = 16.dp, vertical = 14.dp)) {
-            Text("ДАТА СОЗДАНИЯ", color = Gray, fontSize = 9.sp, letterSpacing = 2.sp, maxLines = 1)
-            Spacer(Modifier.height(6.dp))
-            Text(
-                date, color = Color.White, fontSize = 16.sp,
-                fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
-                maxLines = 1, softWrap = false
-            )
-        }
+        InfoBox("ДАТА СОЗДАНИЯ", date, isDate = true, modifier = Modifier.weight(1.7f))
+        InfoBox("ВРЕМЯ", time, isDate = false, modifier = Modifier.weight(1f))
+    }
+}
 
-        // пунктирный разделитель с «вырезами» как у билета
-        Canvas(Modifier.width(14.dp).fillMaxHeight()) {
-            val notch = 7.dp.toPx()
-            drawCircle(Bg, radius = notch, center = Offset(center.x, 0f))
-            drawCircle(Bg, radius = notch, center = Offset(center.x, size.height))
-            drawLine(
-                color = Violet.copy(alpha = 0.6f),
-                start = Offset(center.x, notch + 4.dp.toPx()),
-                end = Offset(center.x, size.height - notch - 4.dp.toPx()),
-                strokeWidth = 1.5.dp.toPx(),
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx()))
-            )
-        }
-
-        Column(Modifier.weight(1f).padding(horizontal = 16.dp, vertical = 14.dp)) {
-            Text("ВРЕМЯ", color = Gray, fontSize = 9.sp, letterSpacing = 2.sp, maxLines = 1)
-            Spacer(Modifier.height(6.dp))
+@Composable
+private fun InfoBox(label: String, value: String, isDate: Boolean, modifier: Modifier) {
+    val shape = RoundedCornerShape(14.dp)
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, color = Gray, fontSize = 8.sp, letterSpacing = 1.sp, maxLines = 1)
+        Spacer(Modifier.height(6.dp))
+        Row(
+            Modifier.fillMaxWidth().height(52.dp)
+                .clip(shape).background(CardBg)
+                .border(1.5.dp, Violet, shape),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Canvas(Modifier.size(18.dp)) {
+                val sw = 1.8.dp.toPx()
+                val c = VioletLight
+                if (isDate) {
+                    drawRoundRect(
+                        c, topLeft = Offset(sw, size.height * 0.18f),
+                        size = Size(size.width - 2 * sw, size.height * 0.74f),
+                        cornerRadius = CornerRadius(3.5.dp.toPx()), style = Stroke(sw)
+                    )
+                    drawLine(c, Offset(sw, size.height * 0.42f), Offset(size.width - sw, size.height * 0.42f), sw)
+                    drawLine(c, Offset(size.width * 0.3f, sw / 2), Offset(size.width * 0.3f, size.height * 0.3f), sw, StrokeCap.Round)
+                    drawLine(c, Offset(size.width * 0.7f, sw / 2), Offset(size.width * 0.7f, size.height * 0.3f), sw, StrokeCap.Round)
+                } else {
+                    drawCircle(c, radius = size.minDimension / 2 - sw, style = Stroke(sw))
+                    drawLine(c, center, Offset(center.x, size.height * 0.24f), sw, StrokeCap.Round)
+                    drawLine(c, center, Offset(size.width * 0.72f, center.y), sw, StrokeCap.Round)
+                }
+            }
+            Spacer(Modifier.width(8.dp))
             Text(
-                time, color = VioletLight, fontSize = 16.sp,
+                value, color = VioletLight, fontSize = 18.sp,
                 fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
                 maxLines = 1, softWrap = false
             )
@@ -482,10 +488,10 @@ fun AddSheet(onDismiss: () -> Unit, onAdd: (String, Color) -> Unit) {
                         }
                     }
                 }
-                Spacer(Modifier.width(22.dp))
-                Box(Modifier.padding(top = 2.dp).width(1.dp).height(48.dp).background(Track))
-                Spacer(Modifier.width(22.dp))
-                Column(horizontalAlignment = Alignment.Start) {
+                Column(
+                    Modifier.weight(1f).padding(start = 72.dp),
+                    horizontalAlignment = Alignment.Start
+                ) {
                     Text("ВРЕМЯ", color = Color.White, fontSize = 12.sp, letterSpacing = 2.sp)
                     Spacer(Modifier.height(12.dp))
                     Box(Modifier.height(28.dp), contentAlignment = Alignment.CenterStart) {
