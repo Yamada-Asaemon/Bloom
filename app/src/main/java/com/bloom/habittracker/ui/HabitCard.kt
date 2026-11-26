@@ -12,6 +12,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -42,7 +43,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +58,11 @@ import java.time.Instant
 import java.time.ZoneId
 
 private const val HOUR_STAGE_SECONDS = 3600L
+
+// Высота всего, кроме кольца (шапка, таймер, разделитель, дата) с запасом на промежутки
+private val CONTENT_WITHOUT_RING = 270.dp
+
+private val DividerColor = Color(0x4DC4C6D0)
 
 private val MONTHS_GENITIVE_RU = listOf(
     "ЯНВАРЯ", "ФЕВРАЛЯ", "МАРТА", "АПРЕЛЯ", "МАЯ", "ИЮНЯ",
@@ -95,61 +100,63 @@ fun HabitCard(
     val cardShape = RoundedCornerShape(28.dp)
     val elapsedSec = maxOf(0L, (nowMs - habit.startTimeMs) / 1000)
     val ringRatio = (elapsedSec % HOUR_STAGE_SECONDS).toFloat() / HOUR_STAGE_SECONDS
-    val ringSize = if (LocalConfiguration.current.screenWidthDp <= 390) 184.dp else 204.dp
 
-    Column(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .clip(cardShape)
             .background(BloomColors.SurfaceContainer)
             .border(1.dp, BloomColors.OutlineVariant, cardShape)
-            .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 22.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 34.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Spacer(Modifier.size(34.dp))
-            Text(
-                text = habit.title,
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Center,
-                color = habit.color,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fontFamily = Montserrat,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.06.em
-            )
-            DeleteButton(onClick = onDelete)
-        }
-
-        Box(modifier = Modifier.padding(top = 8.dp)) {
-            ProgressRing(ratio = ringRatio, color = habit.color, ringSize = ringSize)
-        }
-
-        Box(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            TimerCard(text = formatTimer(elapsedSec))
-        }
+        val innerWidth = maxWidth - 36.dp
+        val innerHeight = maxHeight - 42.dp
+        val ringSize = minOf(innerWidth * 0.78f, innerHeight - CONTENT_WITHOUT_RING)
+            .coerceIn(168.dp, 272.dp)
 
         Column(
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = "ПРИВЫЧКА СОЗДАНА",
-                color = BloomColors.OnBackground,
-                fontFamily = Montserrat,
-                fontSize = 10.5.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.1.em
-            )
-            Spacer(Modifier.height(14.dp))
-            MetaStack(startTimeMs = habit.startTimeMs)
+            Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 36.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Spacer(Modifier.size(36.dp))
+                Text(
+                    text = habit.title,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    color = habit.color,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontFamily = Montserrat,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.06.em
+                )
+                DeleteButton(onClick = onDelete)
+            }
+
+            Box(modifier = Modifier.padding(top = 8.dp)) {
+                ProgressRing(ratio = ringRatio, color = habit.color, ringSize = ringSize)
+            }
+
+            Box(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                TimerCard(text = formatTimer(elapsedSec))
+            }
+
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                SectionDivider(text = "ПРИВЫЧКА СОЗДАНА")
+                Spacer(Modifier.height(14.dp))
+                MetaStack(startTimeMs = habit.startTimeMs)
+            }
         }
     }
 }
@@ -159,7 +166,7 @@ private fun DeleteButton(onClick: () -> Unit) {
     val shape = RoundedCornerShape(10.dp)
     Box(
         modifier = Modifier
-            .size(34.dp)
+            .size(36.dp)
             .clip(shape)
             .background(BloomColors.SurfaceContainerHigh)
             .border(1.dp, BloomColors.OutlineVariant, shape)
@@ -170,7 +177,7 @@ private fun DeleteButton(onClick: () -> Unit) {
             painter = painterResource(R.drawable.ic_trash),
             contentDescription = "Удалить",
             tint = BloomColors.OnSurfaceVariant,
-            modifier = Modifier.size(16.dp)
+            modifier = Modifier.size(18.dp)
         )
     }
 }
@@ -220,14 +227,14 @@ private fun ProgressRing(ratio: Float, color: Color, ringSize: Dp) {
 @Composable
 private fun TimerCard(text: String) {
     val shape = RoundedCornerShape(20.dp)
-    var fontSizeSp by remember { mutableFloatStateOf(21f) }
+    var fontSizeSp by remember { mutableFloatStateOf(26f) }
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
             .background(BloomColors.SurfaceContainerHigh)
             .border(1.dp, BloomColors.OutlineVariant, shape)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -248,6 +255,26 @@ private fun TimerCard(text: String) {
 }
 
 @Composable
+private fun SectionDivider(text: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(modifier = Modifier.weight(1f).height(1.dp).background(DividerColor))
+        Text(
+            text = text,
+            color = BloomColors.OnBackground,
+            fontFamily = Montserrat,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.1.em
+        )
+        Box(modifier = Modifier.weight(1f).height(1.dp).background(DividerColor))
+    }
+}
+
+@Composable
 private fun MetaStack(startTimeMs: Long) {
     val shape = RoundedCornerShape(18.dp)
     Column(
@@ -256,8 +283,8 @@ private fun MetaStack(startTimeMs: Long) {
             .clip(shape)
             .background(BloomColors.SurfaceContainerHigh)
             .border(1.dp, BloomColors.OutlineVariant, shape)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         MetaRow(text = formatDateLabel(startTimeMs)) { CalendarIcon() }
         MetaRow(text = formatTimeLabel(startTimeMs)) { ClockIcon() }
@@ -267,16 +294,16 @@ private fun MetaStack(startTimeMs: Long) {
 @Composable
 private fun MetaRow(text: String, icon: @Composable () -> Unit) {
     Row(
-        modifier = Modifier.padding(vertical = 2.dp),
+        modifier = Modifier.padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         icon()
         Text(
             text = text,
             color = BloomColors.OnSurfaceVariant,
             fontFamily = Montserrat,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 0.02.em,
             maxLines = 1,
@@ -288,7 +315,7 @@ private fun MetaRow(text: String, icon: @Composable () -> Unit) {
 
 @Composable
 private fun CalendarIcon() {
-    Canvas(modifier = Modifier.size(14.dp)) {
+    Canvas(modifier = Modifier.size(16.dp)) {
         val u = size.width / 24f
         val color = BloomColors.Primary
         val stroke = Stroke(width = 2f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
@@ -307,7 +334,7 @@ private fun CalendarIcon() {
 
 @Composable
 private fun ClockIcon() {
-    Canvas(modifier = Modifier.size(14.dp)) {
+    Canvas(modifier = Modifier.size(16.dp)) {
         val u = size.width / 24f
         val color = BloomColors.Primary
         val stroke = Stroke(width = 2f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
