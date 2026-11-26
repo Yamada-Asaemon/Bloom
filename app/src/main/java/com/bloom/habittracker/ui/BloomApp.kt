@@ -1,5 +1,10 @@
 package com.bloom.habittracker.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -37,19 +42,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.bloom.habittracker.data.Habit
 import com.bloom.habittracker.data.HabitStore
+import com.bloom.habittracker.notifications.Notifications
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
 fun BloomApp(store: HabitStore) {
+    val context = LocalContext.current
     var habits by remember { mutableStateOf(store.load()) }
     var showSheet by remember { mutableStateOf(false) }
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
@@ -57,6 +66,9 @@ fun BloomApp(store: HabitStore) {
     var lastSize by remember { mutableIntStateOf(habits.size) }
     val pagerState = rememberPagerState { habits.size }
     val scope = rememberCoroutineScope()
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
 
     val hasHabits = habits.isNotEmpty()
     LaunchedEffect(hasHabits) {
@@ -189,13 +201,23 @@ fun BloomApp(store: HabitStore) {
             HabitSheet(
                 onCreate = { title, severity ->
                     val now = System.currentTimeMillis()
-                    habits = habits + Habit(
+                    val habit = Habit(
                         id = "habit-$now",
                         title = title,
                         severity = severity,
                         startTimeMs = now
                     )
+                    habits = habits + habit
                     store.save(habits)
+                    Notifications.schedule(context, habit)
+                    if (Build.VERSION.SDK_INT >= 33 &&
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.POST_NOTIFICATIONS
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
                     showSheet = false
                 }
             )
@@ -214,6 +236,7 @@ fun BloomApp(store: HabitStore) {
                     if (id != null) {
                         habits = habits.filter { it.id != id }
                         store.save(habits)
+                        Notifications.cancel(context, id)
                     }
                 },
                 onNo = { pendingDeleteId = null }
