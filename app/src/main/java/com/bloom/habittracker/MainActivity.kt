@@ -7,6 +7,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.bloom.habittracker.data.HabitStore
+import com.bloom.habittracker.notifications.Notifications
 import com.bloom.habittracker.ui.BloomApp
 import com.bloom.habittracker.ui.BloomTheme
 
@@ -18,6 +19,7 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
         )
         val store = HabitStore(this)
+        Notifications.rescheduleAll(this, store.load())
         setContent {
             BloomTheme { BloomApp(store) }
         }
