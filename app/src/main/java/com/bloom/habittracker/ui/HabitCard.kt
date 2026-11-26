@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,7 +41,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -48,6 +52,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.bloom.habittracker.R
 import com.bloom.habittracker.data.Habit
 import java.time.Instant
 import java.time.ZoneId
@@ -99,7 +104,8 @@ fun HabitCard(
             .background(BloomColors.SurfaceContainer)
             .border(1.dp, BloomColors.OutlineVariant, cardShape)
             .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 22.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().heightIn(min = 34.dp),
@@ -122,33 +128,29 @@ fun HabitCard(
             DeleteButton(onClick = onDelete)
         }
 
-        Spacer(Modifier.height(16.dp))
-        ProgressRing(ratio = ringRatio, color = habit.color, ringSize = ringSize)
+        Box(modifier = Modifier.padding(top = 8.dp)) {
+            ProgressRing(ratio = ringRatio, color = habit.color, ringSize = ringSize)
+        }
 
-        Spacer(Modifier.height(18.dp))
-        TimerCard(text = formatTimer(elapsedSec))
+        Box(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            TimerCard(text = formatTimer(elapsedSec))
+        }
 
-        Spacer(Modifier.height(20.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(2.dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.9f))
-        )
-
-        Spacer(Modifier.height(28.dp))
-        Text(
-            text = "ПРИВЫЧКА СОЗДАНА",
-            color = BloomColors.OnBackground,
-            fontFamily = Montserrat,
-            fontSize = 10.5.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.1.em
-        )
-
-        Spacer(Modifier.height(18.dp))
-        MetaStack(startTimeMs = habit.startTimeMs)
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "ПРИВЫЧКА СОЗДАНА",
+                color = BloomColors.OnBackground,
+                fontFamily = Montserrat,
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.1.em
+            )
+            Spacer(Modifier.height(14.dp))
+            MetaStack(startTimeMs = habit.startTimeMs)
+        }
     }
 }
 
@@ -164,12 +166,11 @@ private fun DeleteButton(onClick: () -> Unit) {
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = "×",
-            color = BloomColors.OnSurfaceVariant,
-            fontFamily = Montserrat,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold
+        Icon(
+            painter = painterResource(R.drawable.ic_trash),
+            contentDescription = "Удалить",
+            tint = BloomColors.OnSurfaceVariant,
+            modifier = Modifier.size(16.dp)
         )
     }
 }
@@ -181,25 +182,38 @@ private fun ProgressRing(ratio: Float, color: Color, ringSize: Dp) {
         animationSpec = tween(350, easing = LinearEasing),
         label = "ring"
     )
-    Canvas(modifier = Modifier.size(ringSize)) {
-        val strokeWidth = 13f / 204f * size.width
-        val radius = 88f / 204f * size.width
-        val center = Offset(size.width / 2f, size.height / 2f)
-        drawCircle(
-            color = BloomColors.OutlineVariant,
-            radius = radius,
-            center = center,
-            style = Stroke(width = strokeWidth)
+    Box(
+        modifier = Modifier.size(ringSize),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(R.drawable.logo),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(ringSize * (160f / 204f))
+                .clip(CircleShape)
         )
-        drawArc(
-            color = color,
-            startAngle = -90f,
-            sweepAngle = 360f * animated,
-            useCenter = false,
-            topLeft = Offset(center.x - radius, center.y - radius),
-            size = Size(radius * 2f, radius * 2f),
-            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-        )
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val strokeWidth = 13f / 204f * size.width
+            val radius = 88f / 204f * size.width
+            val center = Offset(size.width / 2f, size.height / 2f)
+            drawCircle(
+                color = BloomColors.OutlineVariant,
+                radius = radius,
+                center = center,
+                style = Stroke(width = strokeWidth)
+            )
+            drawArc(
+                color = color,
+                startAngle = -90f,
+                sweepAngle = 360f * animated,
+                useCenter = false,
+                topLeft = Offset(center.x - radius, center.y - radius),
+                size = Size(radius * 2f, radius * 2f),
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+        }
     }
 }
 
